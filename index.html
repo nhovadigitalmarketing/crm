@@ -25,9 +25,18 @@ button,input,select,textarea{font:inherit}button{cursor:pointer}.sidebar{positio
 #nhova-user-menu{position:fixed;right:22px;top:16px;z-index:10000;display:none;align-items:center;gap:10px;padding:8px 12px;border-radius:12px;background:#171717;border:1px solid #303030;color:#fff;font:13px Inter,Arial,sans-serif}
 #nhova-user-menu .nhova-role{color:#999;font-size:11px}
 #nhova-logout{margin-left:8px;padding:6px 10px;border:1px solid #444;border-radius:8px;background:#222;color:#fff;cursor:pointer}
+
+.org-chart-wrap{margin-top:14px;padding:16px;border:1px solid var(--line);border-radius:16px;background:rgba(17,17,20,.75)}
+.org-chart{display:flex;flex-direction:column;align-items:center;gap:12px;overflow-x:auto;padding:10px 0}
+.org-level{display:flex;justify-content:center;align-items:flex-start;gap:18px}
+.org-node{min-width:150px;padding:12px 14px;border:1px solid var(--line);border-radius:12px;background:linear-gradient(180deg,#15161a,#0d0d10);text-align:center;box-shadow:0 14px 30px rgba(0,0,0,.18)}
+.org-node strong{display:block;font-size:15px;font-weight:800}
+.org-node small{display:block;margin-top:5px;color:var(--muted);font-size:10px;letter-spacing:.06em;text-transform:uppercase}
+.org-node.accent{border-color:rgba(255,31,45,.5);box-shadow:0 0 0 1px rgba(255,31,45,.08)}
+.org-connector{position:relative;width:100%;height:18px}
+.org-connector:before{content:"";position:absolute;left:50%;top:0;width:2px;height:18px;background:var(--line);transform:translateX(-50%)}
+.org-connector:after{content:"";position:absolute;left:50%;top:8px;width:calc(100% - 60px);height:2px;background:var(--line);transform:translateX(-50%)}
 </style>
-
-
 
 </head>
 <body>
@@ -161,16 +170,32 @@ function nhovaCurrentUser(){
  try{return JSON.parse(localStorage.getItem("nhova_current_user"))||null}catch(e){return null}
 }
 function nhovaAllowed(p){
+ if(!p) return false;
+ const u=nhovaCurrentUser();
+ if(!u){ return p==="dashboard"; }
+ const access=((window.NHOVA_ROLE_ACCESS||{})[u.role]||[]);
+ return access.includes("all") || access.includes(p);
+}
+function nhovaRequireAccess(key,label){
+ if(!nhovaAllowed(key)){
+   toast((label||"This section")+" is restricted for your role.");
+   page="dashboard";
+   renderNav();
+   render();
+   return false;
+ }
  return true;
 }
 function renderNav(){
  const u=nhovaCurrentUser();
  const access=u ? ((window.NHOVA_ROLE_ACCESS||{})[u.role]||[]) : [];
- document.getElementById("nav").innerHTML=navItems
-   .filter(x=>access.includes("all")||access.includes(x[0])||true)
-   .map(x=>`<button class="nav-item ${page===x[0]?"active":""}" onclick="go('${x[0]}')"><span>${x[1]}</span> ${x[2]}</button>`).join("");
+ const allowed = access.includes("all") ? navItems : navItems.filter(x=>access.includes(x[0]));
+ if(!u && page !== "dashboard") page="dashboard";
+ if(u && !allowed.some(x=>x[0]===page)){ page="dashboard"; }
+ document.getElementById("nav").innerHTML=allowed.map(x=>`<button class="nav-item ${page===x[0]?"active":""}" onclick="go('${x[0]}')"><span>${x[1]}</span> ${x[2]}</button>`).join("") || `<button class="nav-item active" onclick="go('dashboard')"><span>▦</span> Dashboard</button>`;
 }
 function go(p){
+  if(!nhovaAllowed(p)){ toast("Access denied for this section."); page="dashboard"; renderNav(); render(); return; }
   page=p;renderNav();render();
 }
 function render(){
@@ -197,19 +222,101 @@ function dashboard(){
   <div class="card"><div class="section-title">Priority Work</div>${db.tasks.slice(0,5).map(t=>`<div class="list-row"><span><b>${esc(t.title)}</b><br><span class="muted">${esc(t.assignee)} · ${esc(t.deadline)}</span></span>${badge(t.priority)}</div>`).join("")}</div>
   <div class="card"><div class="section-title">Pending Approvals</div>${db.approvals.filter(a=>a.status==="Pending").map(a=>`<div class="list-row"><span><b>${esc(a.item)}</b><br><span class="muted">${esc(a.type)} · ${esc(a.assignedTo)}</span></span>${badge(a.status)}</div>`).join("")||'<div class="empty">No pending approvals</div>'}</div>
  </div>
- <div class="card" style="margin-top:14px"><div class="section-title">Recent Activity</div>${db.activity.slice(-6).reverse().map(a=>`<div class="list-row"><span>${esc(a.text)}</span><span class="muted">${esc(a.time)}</span></div>`).join("")||'<div class="empty">Activity will appear here.</div>'}</div>
- </div>`
+ <div class="card" style="margin-top:14px"><div class="section-title">Recent Activity</div>${db.activity.slice(-6).reverse().map(a=>`<div class="list-row"><span>${esc(a.text)}</span><span class="muted">${esc(a.time)}</span></div>`).join("")||'<div class="empty">Activity will appear here.</div>'}</div>  <div class="org-chart-wrap"><div class="section-title">NHOVA ORGANIZATIONAL STRUCTURE</div><div class="org-chart">
+    <div class="org-level"><div class="org-node accent"><strong>HAIDER</strong><small>FOUNDER / CEO</small></div></div>
+    <div class="org-connector"></div>
+    <div class="org-level">
+      <div class="org-node"><strong>HR</strong><small>TEAM MONITOR</small></div>
+      <div class="org-node"><strong>DMM</strong><small>DIGITAL WORK</small></div>
+      <div class="org-node"><strong>PM/AM</strong><small>PROJECT / ASSETS</small></div>
+    </div>
+    <div class="org-connector"></div>
+    <div class="org-level">
+      <div class="org-node"><strong>BA</strong><small>RESEARCH</small></div>
+      <div class="org-node"><strong>BDM</strong><small>LEADS / SALES</small></div>
+    </div>
+    <div class="org-connector"></div>
+    <div class="org-level"><div class="org-node"><strong>CLIENT</strong><small>CLIENT</small></div></div>
+    <div class="org-connector"></div>
+    <div class="org-level">
+      <div class="org-node"><strong>CWM</strong><small>CONTENT / WRITING</small></div>
+      <div class="org-node"><strong>CWE</strong><small>CONTENT / SCRIPTS</small></div>
+    </div>
+  </div></div> </div>`
 }
 function hoursFor(id){let sessions=db.attendance[id]?.sessions||[];let ms=sessions.reduce((a,s)=>a+(new Date(s.end||Date.now())-new Date(s.start)),0);return (ms/3600000).toFixed(2)+"h"}
+function getCurrentEmployeeId(){
+  const u=nhovaCurrentUser();
+  if(!u) return db.employees[0]?.id || "EMP001";
+  const exact = db.employees.find(e => e.name.toLowerCase() === String(u.name || "").toLowerCase());
+  if(exact) return exact.id;
+  const username = String(u.username || "").toLowerCase();
+  if(username){
+    const matched = db.employees.find(e => {
+      const full = e.name.toLowerCase();
+      const first = full.split(/\s+/)[0];
+      return first === username || full.replace(/\s+/g, "") === username || e.id.toLowerCase() === username;
+    });
+    if(matched) return matched.id;
+  }
+  return db.employees.find(e => e.role === (u.role || ""))?.id || db.employees[0]?.id || "EMP001";
+}
+function getCurrentEmployee(){
+  return db.employees.find(e => e.id === getCurrentEmployeeId()) || db.employees[0] || {id:"EMP001",name:"Haider Ali",role:"Founder & CEO"};
+}
+function getCurrentEmployeeActiveSession(){
+  const employeeId = getCurrentEmployeeId();
+  const sessions = db.attendance[employeeId]?.sessions || [];
+  return sessions.slice().reverse().find(s => !s.end) || null;
+}
+function syncActiveSessionForCurrentEmployee(){
+  activeSession = getCurrentEmployeeActiveSession();
+}
 function tablePage(title,sub,headers,rows,button){return `<div class="page">${pageHead(title,sub,button)}<div class="card"><div class="table-wrap"><table class="table"><thead><tr>${headers.map(h=>`<th>${h}</th>`).join("")}</tr></thead><tbody>${rows||`<tr><td colspan="${headers.length}" class="empty">No records found.</td></tr>`}</tbody></table></div></div></div>`}
 function employees(){return tablePage("Employees","People, departments, designations and account status",["Employee","Designation","Department","Status","Today's Hours","Action"],db.employees.map(e=>`<tr><td><b>${esc(e.name)}</b><br><span class="muted">${e.id}</span></td><td>${esc(e.role)}</td><td>${esc(e.dept)}</td><td>${badge(e.status)}</td><td>${hoursFor(e.id)}</td><td><button class="btn" onclick="viewEmployee('${e.id}')">View</button></td></tr>`).join(""),`<button class="btn primary" onclick="openEmployee()">+ Employee</button>`)}
-function attendance(){return `<div class="page">${pageHead("Attendance & Work Sessions","Flexible working · database-backed session records",`<button class="btn ${activeSession?"danger":"primary"}" onclick="${activeSession?"endShift()":"startShift()"}">${activeSession?"END TODAY SHIFT":"START TODAY SHIFT"}</button>`)}
-<div class="grid two"><div class="card"><div class="eyebrow">TODAY · 28 AUG 2026</div><div class="timer" id="timer">${activeSession?elapsed(activeSession.start):hoursFor("EMP001")}</div><div class="big-status">${activeSession?'<span class="status-dot"></span> WORKING':'○ NOT WORKING'}</div><div class="redline"></div><div class="section-title">Today's Work</div><b>${hoursFor("EMP001")}</b> / 8h<div class="footer-note">8 hours is the current daily limit. The system does not force logout.</div></div>
-<div class="card"><div class="section-title">My Work Sessions</div>${(db.attendance.EMP001?.sessions||[]).map(s=>`<div class="list-row"><span>${new Date(s.start).toLocaleTimeString()} → ${s.end?new Date(s.end).toLocaleTimeString():"Active"}</span><b>${s.end?((new Date(s.end)-new Date(s.start))/3600000).toFixed(2)+"h":"LIVE"}</b></div>`).join("")||'<div class="empty">No sessions yet.</div>'}</div></div>
-<div class="card" style="margin-top:14px"><div class="section-title">Founder Live View</div><table class="table"><thead><tr><th>Employee</th><th>Status</th><th>Today's Hours</th></tr></thead><tbody>${db.employees.map(e=>`<tr><td>${esc(e.name)}</td><td>${badge(e.status)}</td><td>${hoursFor(e.id)}</td></tr>`).join("")}</tbody></table></div></div>`}
+function isAdminLikeRole(){
+  const u=nhovaCurrentUser();
+  if(!u) return true;
+  return ["Founder & CEO","HR Manager","Human Resources","NHOVA HR"].includes(u.role) || String(u.role || "").toLowerCase().includes("hr");
+}
+function attendance(){
+  const employeeId = getCurrentEmployeeId();
+  const employee = getCurrentEmployee();
+  const session = activeSession && activeSession.employeeId === employeeId ? activeSession : getCurrentEmployeeActiveSession();
+  const sessions = db.attendance[employeeId]?.sessions || [];
+  const canViewTeam = isAdminLikeRole();
+  const teamRows = db.employees.map(e=>`<tr><td>${esc(e.name)}</td><td>${badge(e.status)}</td><td>${hoursFor(e.id)}</td></tr>`).join("");
+  const summaryCard = canViewTeam ? `<div class="card" style="margin-top:14px"><div class="section-title">${employee.name} Team Attendance Overview</div><table class="table"><thead><tr><th>Employee</th><th>Status</th><th>Today's Hours</th></tr></thead><tbody>${teamRows}</tbody></table></div>` : `<div class="card" style="margin-top:14px"><div class="section-title">${employee.name} Attendance Summary</div><div class="list-row"><span>Employee ID</span><b>${employee.id}</b></div><div class="list-row"><span>Current status</span><b>${badge(employee.status)}</b></div><div class="list-row"><span>Total logged hours</span><b>${hoursFor(employee.id)}</b></div></div>`;
+  return `<div class="page">${pageHead("Attendance & Work Sessions","Flexible working · database-backed session records",`<button class="btn ${session?"danger":"primary"}" onclick="${session?"endShift()":"startShift()"}">${session?"END TODAY SHIFT":"START TODAY SHIFT"}</button>`)}
+<div class="grid two"><div class="card"><div class="eyebrow">TODAY · 28 AUG 2026</div><div class="timer" id="timer">${session?elapsed(session.start):hoursFor(employeeId)}</div><div class="big-status">${session?'<span class="status-dot"></span> WORKING':'○ NOT WORKING'}</div><div class="redline"></div><div class="section-title">Today's Work</div><b>${hoursFor(employeeId)}</b> / 8h<div class="footer-note">8 hours is the current daily limit. The system does not force logout.</div></div>
+<div class="card"><div class="section-title">My Work Sessions</div>${sessions.map(s=>`<div class="list-row"><span>${new Date(s.start).toLocaleTimeString()} → ${s.end?new Date(s.end).toLocaleTimeString():"Active"}</span><b>${s.end?((new Date(s.end)-new Date(s.start))/3600000).toFixed(2)+"h":"LIVE"}</b></div>`).join("")||'<div class="empty">No sessions yet.</div>'}</div></div>
+${summaryCard}</div>`}
 function elapsed(start){let ms=Date.now()-new Date(start);let h=Math.floor(ms/3600000),m=Math.floor(ms%3600000/60000),s=Math.floor(ms%60000/1000);return [h,m,s].map(x=>String(x).padStart(2,"0")).join(":")}
-function startShift(){if(activeSession)return;let e=db.employees[0];let s={start:new Date().toISOString(),end:null};db.attendance.EMP001??={sessions:[]};db.attendance.EMP001.sessions.push(s);activeSession=s;e.status="Working";db.activity.push({text:"Haider Ali started a work session",time:new Date().toLocaleTimeString()});save();render();toast("Shift started")}
-function endShift(){if(!activeSession)return;activeSession.end=new Date().toISOString();db.employees[0].status="Offline";db.activity.push({text:"Haider Ali ended a work session",time:new Date().toLocaleTimeString()});activeSession=null;save();render();toast("Work session saved")}
+function startShift(){
+  const employee = getCurrentEmployee();
+  const employeeId = employee.id;
+  if(getCurrentEmployeeActiveSession()) return;
+  const s={employeeId,start:new Date().toISOString(),end:null};
+  db.attendance[employeeId] ??= {sessions:[]};
+  db.attendance[employeeId].sessions.push(s);
+  activeSession=s;
+  const emp = db.employees.find(e => e.id === employeeId);
+  if(emp) emp.status = "Working";
+  db.activity.push({text:`${employee.name} started a work session`,time:new Date().toLocaleTimeString()});
+  save();render();toast("Shift started")
+}
+function endShift(){
+  const employee = getCurrentEmployee();
+  const employeeId = employee.id;
+  const session = getCurrentEmployeeActiveSession();
+  if(!session) return;
+  session.end = new Date().toISOString();
+  const emp = db.employees.find(e => e.id === employeeId);
+  if(emp) emp.status = "Offline";
+  db.activity.push({text:`${employee.name} ended a work session`,time:new Date().toLocaleTimeString()});
+  activeSession = null;
+  save();render();toast("Work session saved")
+}
 function tasks(){let au=(window.NHOVA_AUTH&&window.NHOVA_AUTH.current)?window.NHOVA_AUTH.current():null;let isFounder=au&&au.username==="haider";let list=isFounder?db.tasks:db.tasks.filter(t=>t.assignee===(au&&au.name));let today=new Date().toISOString().slice(0,10);list.forEach(t=>{if(t.status!=="Completed"&&t.deadline&&t.deadline<today)t.status="Overdue"});let rows=list.map(t=>`<tr><td><b>${esc(t.title)}</b><br><span class="muted">${t.id}</span></td><td>${esc(t.assignee)}</td><td>${badge(t.priority)}</td><td>${badge(t.status)}</td><td>${esc(t.deadline)}${t.reminder?`<br><span class="muted">🔔 ${esc(t.reminder.replace("T"," "))}</span>`:""}</td><td><button class="btn" onclick="toggleTask('${t.id}')">${t.status==="Completed"?"Reopen":"Complete"}</button></td></tr>`).join("");return tablePage(isFounder?"Tasks — All Employees":"My Tasks","Assignment, reminders, deadlines and priorities",["Task","Assignee","Priority","Status","Deadline / Reminder","Action"],rows,`<button class="btn primary" onclick="openTask()">+ New Task</button>`)}
 function leads(){return `<div class="page">${pageHead("Lead Management","Prospecting, qualification, follow-ups and conversion",`<button class="btn" onclick="exportCSV('leads')">Export CSV</button><button class="btn primary" onclick="openLead()">+ New Lead</button>`)}
 <div class="card"><div class="filters"><input id="leadFilter" placeholder="Search name/company/mobile..." oninput="filterLeads()"><select id="stageFilter" onchange="filterLeads()"><option value="">All stages</option>${["New","Contacted","Follow-up","Interested","Proposal Sent","Negotiation","Won","Lost","On Hold"].map(x=>`<option>${x}</option>`).join("")}</select></div><div class="table-wrap"><table class="table"><thead><tr><th>Lead</th><th>Company</th><th>Mobile</th><th>Stage</th><th>Owner</th><th>Value</th><th>Next Follow-up</th><th>Action</th></tr></thead><tbody id="leadRows">${leadRows(db.leads)}</tbody></table></div></div></div>`}
@@ -232,6 +339,32 @@ function contributions(){return tablePage("Contributions","Objective contributio
 function settings(){return `<div class="page">${pageHead("Company Settings","NHOVA branding, workspace controls and data management","")}<div class="grid two"><div class="card"><div class="section-title">Company</div><div class="form-grid"><div class="field"><label>Company Name</label><input value="NHOVA Digital Marketing"></div><div class="field"><label>Tagline</label><input value="Turning Attention Into Impact"></div><div class="field"><label>Working Rule</label><input value="Flexible · Maximum 8 hours/day"></div><div class="field"><label>Timezone</label><input value="Asia/Kolkata"></div></div><div class="actions" style="margin-top:14px"><button class="btn primary" onclick="toast('Settings saved')">Save Settings</button></div></div><div class="card"><div class="section-title">Data</div><p class="muted">All data in this demo software is stored locally in your browser using localStorage.</p><button class="btn" onclick="exportJSON()">Backup JSON</button> <button class="btn danger" onclick="resetDB()">Reset Demo Data</button><p class="footer-note">For production multi-user deployment, connect the same module structure to Supabase Auth/PostgreSQL/Storage with RLS.</p></div></div></div>`}
 function generic(){return `<div class="page">${pageHead(page[0].toUpperCase()+page.slice(1),"NHOVA enterprise module","")}<div class="card empty">Module ready. Use the navigation to manage company operations.</div></div>`}
 const pages={dashboard,hr,employees,attendance,tasks,calendar,leads,research,clients,sales,content,scripts,ideas,projects,assets,documents,approvals,reports,analytics,contributions,settings};
+
+const ROLE_GATED_ACTIONS = {
+  tasks: ["openTask","addTask","toggleTask"],
+  leads: ["openLead","addLead","convertLead","openLeadFollowup","saveLeadFollowup"],
+  research: ["openResearch","addResearch","sendResearch"],
+  clients: ["openClient","addClient"],
+  projects: ["openProject","addProject"],
+  content: ["openScript","addScript"],
+  scripts: ["openScript","addScript","advanceScript"],
+  ideas: ["openIdea","addIdea","ideaToScript"],
+  employees: ["openEmployee","addEmployee","viewEmployee"],
+  hr: ["openHRIssue","addHRIssue","resolveHRIssue"],
+  documents: ["openDocument"],
+  assets: ["openAsset"]
+};
+Object.entries(ROLE_GATED_ACTIONS).forEach(([pageKey, names])=>{
+  names.forEach(name=>{
+    const original = window[name];
+    if(typeof original === "function"){
+      window[name] = function(...args){
+        if(!nhovaRequireAccess(pageKey, name)){ return undefined; }
+        return original.apply(this, args);
+      };
+    }
+  });
+});
 
 function hr(){let today=new Date().toISOString().slice(0,10);let overdue=db.tasks.filter(t=>t.status!=="Completed"&&t.deadline&&t.deadline<today).length;let working=db.employees.filter(e=>e.status==="Working").length;return `<div class="page">${pageHead("HR Monitoring","Team working status, tasks, deadlines and issue comments","")}<div class="grid kpis">${kpi("Employees",db.employees.length)}${kpi("Working Now",working,"● Live status")}${kpi("Overdue Tasks",overdue)}${kpi("Open Issues",db.activity.filter(a=>a.type==="hr_issue"&&!a.resolved).length)}</div><div class="card" style="margin-top:14px"><div class="section-title">Team Work Overview</div><div class="table-wrap"><table class="table"><thead><tr><th>Employee</th><th>Role</th><th>Status</th><th>Today's Hours</th><th>Open Tasks</th><th>Overdue</th><th>Action</th></tr></thead><tbody>${db.employees.filter(e=>e.role!=="HR Manager").map(e=>{let ts=db.tasks.filter(t=>t.assignee===e.name&&t.status!=="Completed");let od=ts.filter(t=>t.deadline&&t.deadline<today).length;return `<tr><td><b>${esc(e.name)}</b></td><td class="muted">${esc(e.role)}</td><td>${badge(e.status)}</td><td>${hoursFor(e.id)}</td><td>${ts.length}</td><td>${od?badge("Overdue"):"0"}</td><td><button class="btn" onclick="openHRIssue('${e.id}')">Mark / Comment</button></td></tr>`}).join("")}</tbody></table></div></div><div class="card" style="margin-top:14px"><div class="section-title">HR Issues / Comments</div>${db.activity.filter(a=>a.type==="hr_issue").slice(-10).reverse().map(a=>`<div class="list-row"><span><b>${esc(a.employee)}</b> — ${esc(a.text)}<br><span class="muted">${esc(a.time)} · ${a.resolved?"Resolved":"Open"}</span></span><button class="btn" onclick="resolveHRIssue('${a.id}')">${a.resolved?"Reopen":"Resolve"}</button></div>`).join("")||'<div class="empty">No HR comments yet.</div>'}</div></div>`}
 function openHRIssue(id){let e=db.employees.find(x=>x.id===id);openModal(`<h2>HR Note — ${esc(e.name)}</h2><form onsubmit="addHRIssue(event,'${id}')" class="form-grid"><div class="field"><label>Type</label><select name="type"><option>Observation</option><option>Attention Required</option><option>Issue</option></select></div><div class="field full"><label>Comment</label><textarea name="comment" required placeholder="Describe the work issue or observation..."></textarea></div><div class="field full"><button class="btn primary">Save HR Comment</button></div></form>`)}
@@ -299,7 +432,11 @@ localStorage.setItem("nhova_pat", PAT);
 
   function showUser(user, username){
     localStorage.setItem("nhova_current_user", JSON.stringify({username, ...user}));
-    try{if(typeof renderNav==="function")renderNav();if(typeof render==="function")render();}catch(e){}
+    try{
+      if(typeof syncActiveSessionForCurrentEmployee === "function") syncActiveSessionForCurrentEmployee();
+      if(typeof renderNav === "function") renderNav();
+      if(typeof render === "function") render();
+    }catch(e){}
     document.querySelector("#nhova-login-overlay").style.display="none";
     const menu=document.querySelector("#nhova-user-menu");
     menu.style.display="flex";
@@ -333,6 +470,8 @@ localStorage.setItem("nhova_pat", PAT);
   const saved=localStorage.getItem("nhova_current_user");
   if(saved){ try{const s=JSON.parse(saved); if(USERS[s.username]) showUser(USERS[s.username],s.username);}catch(e){} }
 
+  if(typeof syncActiveSessionForCurrentEmployee === "function") syncActiveSessionForCurrentEmployee();
+
   function nhovaCheckTaskReminders(){
     const now=new Date();
     db.tasks.forEach(t=>{
@@ -355,18 +494,23 @@ localStorage.setItem("nhova_pat", PAT);
     logout:logout,
     pat:PAT
   };
+  window.login = login;
+  window.logout = logout;
+  window.nhovaAllowed = nhovaAllowed;
 })();
 
 (function(){
   const ROLE_ACCESS = {
     "Founder & CEO": ["all"],
-    "Co-Founder & Digital Marketing Manager": ["dashboard","tasks","calendar","content","scripts","ideas","projects","assets","documents","approvals","clients","reports"],
-    "Project Manager & Asset Manager": ["dashboard","tasks","calendar","projects","assets","documents","clients","reports"],
-    "Content Writing Manager": ["dashboard","tasks","calendar","content","scripts","ideas","research","projects","clients","approvals"],
-    "Content Writing Executive": ["dashboard","tasks","calendar","content","scripts","ideas"],
-    "Business Analyst & Documentation Manager": ["dashboard","tasks","calendar","research","leads","clients","documents","reports"],
-    "Business Development Manager": ["dashboard","tasks","calendar","leads","clients","sales","research","reports"],
-    "Human Resources": ["dashboard","employees","attendance","tasks","calendar","reports","activity","hr"]
+    "Co-Founder & Digital Marketing Manager": ["dashboard","attendance","tasks","calendar","content","scripts","ideas","projects","assets","documents","approvals","clients","reports"],
+    "Project Manager & Asset Manager": ["dashboard","attendance","tasks","calendar","projects","assets","documents","clients","reports"],
+    "Content Writing Manager": ["dashboard","attendance","tasks","calendar","content","scripts","ideas","research","projects","clients","approvals"],
+    "Content Writing Executive": ["dashboard","attendance","tasks","calendar","content","scripts","ideas"],
+    "Business Analyst & Documentation Manager": ["dashboard","attendance","tasks","calendar","research","leads","clients","documents","reports"],
+    "Business Development Manager": ["dashboard","attendance","tasks","calendar","leads","clients","sales","research","reports"],
+    "HR Manager": ["dashboard","employees","attendance","tasks","calendar","reports","activity","hr"],
+    "Human Resources": ["dashboard","employees","attendance","tasks","calendar","reports","activity","hr"],
+    "NHOVA HR": ["dashboard","employees","attendance","tasks","calendar","reports","activity","hr"]
   };
   window.NHOVA_ROLE_ACCESS = ROLE_ACCESS;
 })();
